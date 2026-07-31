@@ -1,0 +1,13 @@
+name = "fortnite-map-tracker"
+main = "src/worker.js"
+compatibility_date = "2024-01-01"
+
+# Cron trigger — polls every 10 minutes
+[triggers]
+crons = ["*/10 * * * *"]
+
+# KV namespace — stores state between polls
+# After running `wrangler kv namespace create MAP_STATE`, paste the id below.
+[[kv_namespaces]]
+binding = "MAP_STATE"
+id = "PASTE_KV_ID_HERE"
