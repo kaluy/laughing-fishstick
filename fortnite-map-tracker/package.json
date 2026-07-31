@@ -1,0 +1,17 @@
+{
+  "name": "fortnite-map-tracker",
+  "version": "1.0.0",
+  "description": "Watches the Fortnite Ecosystem API for newly published maps and alerts Discord when one crosses a CCU threshold.",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "probe": "node src/probe.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}

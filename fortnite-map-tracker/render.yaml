@@ -1,0 +1,27 @@
+# Render Blueprint — deploys the tracker as a web service.
+# Note: Render's free web services sleep after ~15 min idle, which pauses the
+# poller. For continuous alerting use a paid instance (or a host that stays awake).
+services:
+  - type: web
+    name: fortnite-map-tracker
+    runtime: node
+    plan: starter          # change to "free" to try it (sleeps when idle)
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: DISCORD_WEBHOOK_URL
+        sync: false         # set this in the dashboard, keeps it out of git
+      - key: CCU_THRESHOLD
+        value: "200"
+      - key: MAX_MAP_AGE_DAYS
+        value: "7"
+      - key: POLL_INTERVAL_MINUTES
+        value: "10"
+      - key: ISLANDS_PER_POLL
+        value: "300"
+      - key: ALERT_ON_FIRST_RUN
+        value: "false"
+      # Optional AI trend detection — set in dashboard if you want it:
+      # - key: ANTHROPIC_API_KEY
+      #   sync: false
