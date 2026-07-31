@@ -21,7 +21,7 @@ export const config = {
   maxMapAgeDays: num("MAX_MAP_AGE_DAYS", 14),
 
   pollIntervalMinutes: num("POLL_INTERVAL_MINUTES", 10),
-  islandsPerPoll: num("ISLANDS_PER_POLL", 300),
+  islandsPerPoll: num("ISLANDS_PER_POLL", 600),
   alertOnFirstRun: bool("ALERT_ON_FIRST_RUN", false),
 
   port: num("PORT", 3000),

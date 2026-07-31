@@ -171,30 +171,63 @@ export function latestCcuFromMetrics(payload) {
 
 // ---- endpoints ------------------------------------------------------------
 
-/** GET /islands — one page. Params kept minimal for compatibility. */
-export async function listIslands({ limit = 100, offset = 0 } = {}) {
+/** GET /islands — one page. sortBy is optional; omit to use API default. */
+export async function listIslands({ limit = 100, offset = 0, sortBy = null } = {}) {
   const u = new URL(`${config.apiBase}/islands`);
   u.searchParams.set("limit", String(limit));
   u.searchParams.set("offset", String(offset));
-  // best-effort sort so the busiest (most likely to cross the threshold) come first
-  u.searchParams.set("sortBy", "plays");
-  u.searchParams.set("order", "desc");
+  if (sortBy) {
+    u.searchParams.set("sortBy", sortBy);
+    u.searchParams.set("order", "desc");
+  }
   const payload = await getJson(u.toString());
   return extractList(payload);
 }
 
-/** Fetch up to `total` islands across as many pages as needed. */
-export async function listIslandsBulk(total) {
+/** Fetch up to `total` islands across pages with an optional sort. */
+async function listIslandsBulkSort(total, sortBy = null) {
   const pageSize = 100;
   const out = [];
   for (let offset = 0; out.length < total; offset += pageSize) {
-    const page = await listIslands({ limit: pageSize, offset });
+    const page = await listIslands({ limit: pageSize, offset, sortBy });
     if (!page.length) break;
     out.push(...page);
     if (page.length < pageSize) break;
-    await sleep(250); // be gentle
+    await sleep(250);
   }
   return out.slice(0, total);
+}
+
+/**
+ * Multi-pass fetch across known-good sort params, deduplicated.
+ * - Pass 1: sortBy=plays  (most popular — almost certain to work)
+ * - Pass 2: no sort param (API default, whatever that returns)
+ * - Pass 3: sortBy=peakCcu (if the API supports it)
+ * Each pass gets half the total quota; duplicates are dropped.
+ * If a sort param isn't supported the API usually just ignores it or errors,
+ * so unknown params are caught and skipped rather than crashing the poll.
+ */
+export async function listIslandsBulk(total) {
+  const perPass = Math.ceil(total / 2);
+  const seen = new Set();
+  const out = [];
+
+  const addAll = (islands) => {
+    for (const island of islands) {
+      const code = islandCode(island);
+      if (!code || seen.has(code)) continue;
+      seen.add(code);
+      out.push(island);
+    }
+  };
+
+  // Pass 1: by plays — the reliable baseline
+  try { addAll(await listIslandsBulkSort(perPass, "plays")); } catch {}
+
+  // Pass 2: no sort (API default order, catches anything pass 1 missed)
+  try { addAll(await listIslandsBulkSort(perPass, null)); } catch {}
+
+  return out;
 }
 
 /** GET /islands/{code} — full metadata (used to confirm a real publish date). */
