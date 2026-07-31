@@ -10,4 +10,4 @@ crons = ["*/10 * * * *"]
 # After running `wrangler kv namespace create MAP_STATE`, paste the id below.
 [[kv_namespaces]]
 binding = "MAP_STATE"
-id = "696d70d269a44a0fbc92ee1e5b57fb67"
+id = "PASTE_KV_ID_HERE"

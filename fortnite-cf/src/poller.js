@@ -123,7 +123,9 @@ export async function runPoll(env) {
 
   state.lastPollAt = now;
   state.lastScan = islands.length;
+  state.scanned = islands.length;
   state.lastChecked = candidates.length;
+  state.checked = candidates.length;
   state.alertTotal = Object.values(state.maps).filter(m => m.alerted).length;
 
   await env.MAP_STATE.put("state", JSON.stringify(state));

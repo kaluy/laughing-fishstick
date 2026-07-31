@@ -14,8 +14,8 @@ async function handleRequest(request, env) {
     const state = raw ? JSON.parse(raw) : {};
     return json({
       lastPollAt:   state.lastPollAt   || null,
-      scanned:      state.lastScan     || 0,
-      checked:      state.lastChecked  || 0,
+      scanned:      state.lastScan || state.scanned || 0,
+      checked:      state.lastChecked || state.checked || 0,
       alertTotal:   state.alertTotal   || 0,
       discordConfigured: Boolean(env.DISCORD_WEBHOOK_URL),
       ccuThreshold: Number(env.CCU_THRESHOLD || 200),
@@ -50,7 +50,7 @@ async function handleRequest(request, env) {
   if (url.pathname === "/api/poll") {
     // Manual trigger — useful for testing
     const state = await runPoll(env);
-    return json({ ok: true, scanned: state.lastScan });
+    return json({ ok: true, scanned: state.lastScan || state.scanned || 0 });
   }
 
   // Everything else → dashboard HTML
@@ -151,7 +151,13 @@ footer{margin-top:30px;font-family:var(--mono);font-size:11px;color:var(--faint)
 function timeAgo(iso){if(!iso)return"never";const s=Math.floor((Date.now()-new Date(iso))/1000);if(s<60)return s+"s ago";if(s<3600)return Math.floor(s/60)+"m ago";if(s<86400)return Math.floor(s/3600)+"h ago";return Math.floor(s/86400)+"d ago";}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 async function tick(){
-  const [st, maps] = await Promise.all([fetch("/api/status").then(r=>r.json()), fetch("/api/maps").then(r=>r.json())]);
+  let st, maps;
+  try {
+    [st, maps] = await Promise.all([fetch("/api/status").then(r=>r.json()), fetch("/api/maps").then(r=>r.json())]);
+  } catch(e) {
+    document.getElementById("list").innerHTML='<div class="empty"><div class="big">Error loading data: '+e.message+'</div></div>';
+    return;
+  }
   const thr = st.ccuThreshold;
   document.getElementById("rule").innerHTML = \`Watching maps <span class="n">≤ \${st.maxMapAgeDays} days</span> old reaching <b>\${thr}+</b> players. Polls every \${st.pollInterval} min.\`;
   document.getElementById("s-last").textContent = timeAgo(st.lastPollAt);
@@ -164,7 +170,7 @@ async function tick(){
   pulse.className = st.lastPollAt ? "pulse live" : "pulse";
 
   const list = document.getElementById("list");
-  if(!maps.length){list.innerHTML='<div class="empty"><div class="big">No new maps yet.</div>First cron runs within 10 min. Or visit /api/poll to trigger manually.</div>';return;}
+  if(!maps||!maps.length){list.innerHTML='<div class="empty"><div class="big">No new maps in window yet.</div>Maps appear here once the cron has run. Hit /api/poll to trigger now.</div>';return;}
   list.innerHTML = maps.map(m=>{
     const ccu=m.ccu, known=ccu!=null, hot=known&&ccu>=thr;
     const scaleMax=Math.max(thr*1.5,ccu||0), fill=known?Math.min(100,(ccu/scaleMax)*100):0, tp=Math.min(100,(thr/scaleMax)*100);
