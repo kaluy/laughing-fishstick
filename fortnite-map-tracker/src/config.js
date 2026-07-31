@@ -18,7 +18,7 @@ export const config = {
   discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL || "",
 
   ccuThreshold: num("CCU_THRESHOLD", 200),
-  maxMapAgeDays: num("MAX_MAP_AGE_DAYS", 7),
+  maxMapAgeDays: num("MAX_MAP_AGE_DAYS", 14),
 
   pollIntervalMinutes: num("POLL_INTERVAL_MINUTES", 10),
   islandsPerPoll: num("ISLANDS_PER_POLL", 300),

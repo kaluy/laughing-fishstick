@@ -133,21 +133,40 @@ function firstUrl(v) {
   return null;
 }
 
-/** Pull the highest peak-CCU value out of a metrics payload. */
+const CCU_KEYS = ["ccu", "concurrentUsers", "concurrent_users", "activePlayers", "active_players",
+  "peakCcu", "peakCCU", "peak_ccu", "maxCcu", "peakConcurrentUsers", "peak_concurrent_users"];
+
+function ccuFromObj(obj) {
+  const v = firstDefined(obj, CCU_KEYS);
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Pull the highest CCU value out of a metrics payload (used for peak mode). */
 export function peakCcuFromMetrics(payload) {
   const points = extractList(payload);
   let peak = 0;
-  const scan = (obj) => {
-    const v = firstDefined(obj, [
-      "peakCcu", "peakCCU", "peak_ccu", "maxCcu", "ccu",
-      "peakConcurrentUsers", "peak_concurrent_users", "concurrentUsers",
-    ]);
-    const n = Number(v);
-    if (Number.isFinite(n) && n > peak) peak = n;
-  };
-  if (Array.isArray(points) && points.length) points.forEach(scan);
-  else scan(payload); // some responses return a single summary object
+  if (Array.isArray(points) && points.length) points.forEach(p => { const n = ccuFromObj(p); if (n > peak) peak = n; });
+  else { const n = ccuFromObj(payload); if (n > peak) peak = n; }
   return peak;
+}
+
+/**
+ * Pull the MOST RECENT CCU value — the last hourly bucket in the time series.
+ * This is as close to "live right now" as Epic's API exposes.
+ * Falls back to peak if payload is a single object.
+ */
+export function latestCcuFromMetrics(payload) {
+  const points = extractList(payload);
+  if (Array.isArray(points) && points.length) {
+    const sorted = [...points].sort((a, b) => {
+      const ta = new Date(firstDefined(a, ["timestamp","time","date","t"]) || 0).getTime();
+      const tb = new Date(firstDefined(b, ["timestamp","time","date","t"]) || 0).getTime();
+      return ta - tb;
+    });
+    return ccuFromObj(sorted[sorted.length - 1]);
+  }
+  return ccuFromObj(payload);
 }
 
 // ---- endpoints ------------------------------------------------------------
@@ -213,4 +232,36 @@ export async function getRecentPeakCcu(code, { days = 1, interval = "hour" } = {
     }
   }
   throw lastErr || new Error("metrics request failed");
+}
+
+/**
+ * GET the most recent hourly CCU bucket — as close to "live right now" as the
+ * Fortnite Ecosystem API allows. Requests only the last 2 hours so the most
+ * recent data point is always the current hour.
+ */
+export async function getLiveCcu(code) {
+  const end = new Date();
+  const start = new Date(end.getTime() - 2 * 3600000); // last 2 hours
+  const iso = (d) => d.toISOString().slice(0, 10);
+
+  const schemes = [
+    { from: iso(start), to: iso(end), interval: "hour" },
+    { startDate: iso(start), endDate: iso(end), interval: "hour" },
+    { start: iso(start), end: iso(end), interval: "hour" },
+    { interval: "hour" },
+  ];
+
+  let lastErr;
+  for (const params of schemes) {
+    const u = new URL(`${config.apiBase}/islands/${encodeURIComponent(code)}/metrics`);
+    for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+    try {
+      const payload = await getJson(u.toString(), { retries: 1 });
+      return latestCcuFromMetrics(payload);
+    } catch (err) {
+      lastErr = err;
+      if (err.status && err.status !== 400 && err.status !== 422) throw err;
+    }
+  }
+  throw lastErr || new Error("live ccu request failed");
 }

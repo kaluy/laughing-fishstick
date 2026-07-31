@@ -95,11 +95,13 @@ export async function pollOnce() {
     }
   }
 
-  // 2. Candidates: new, not yet alerted.
+  // 2. Candidates: ALL maps within the age window, alerted or not.
+  // We re-check every poll so we never miss a map that crossed the threshold
+  // between scans. Already-alerted maps are checked but guarded below.
   const candidates = islands
     .map((i) => store.getMap(api.islandCode(i)))
     .filter(Boolean)
-    .filter((m) => !m.alerted && isNew(m));
+    .filter((m) => isNew(m));
 
   // 3. For each candidate: enrich (name, thumbnail, what it's based on), then
   //    look up recent peak CCU. Only candidates are touched, so request volume
@@ -134,7 +136,7 @@ export async function pollOnce() {
     // 3b. Recent peak CCU.
     let peak = 0;
     try {
-      peak = await api.getRecentPeakCcu(m.code, { days: 1, interval: "hour" });
+      peak = await api.getLiveCcu(m.code);
     } catch (err) {
       console.warn(`[tracker] metrics lookup failed for ${m.code}: ${err.message}`);
       return;
