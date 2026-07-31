@@ -50,13 +50,27 @@ function latestCcu(payload) {
   return ccuOf(payload);
 }
 
-export async function listIslands(limit = 100, offset = 0) {
+export async function listIslands(limit = 100, offset = 0, sortBy = "plays") {
   const u = new URL(`${BASE}/islands`);
   u.searchParams.set("limit", limit);
   u.searchParams.set("offset", offset);
-  u.searchParams.set("sortBy", "plays");
+  u.searchParams.set("sortBy", sortBy);
   u.searchParams.set("order", "desc");
   return listOf(await getJson(u.toString()));
+}
+
+// Try to fetch sorted by publish date so newest maps come first.
+// Falls back to plays sort if the API doesn't support createdAt.
+export async function listIslandsByDate(limit = 100, offset = 0) {
+  try {
+    const r = await listIslands(limit, offset, "createdAt");
+    if (r.length) return r;
+  } catch {}
+  try {
+    const r = await listIslands(limit, offset, "releaseDate");
+    if (r.length) return r;
+  } catch {}
+  return listIslands(limit, offset, "plays");
 }
 
 export async function getMetadata(code) {
